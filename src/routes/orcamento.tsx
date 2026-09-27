@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronRight, ChevronUp, Loader2, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Search } from "lucide-react";
 import { getOrcamentoMes, getOrcamentoMeses } from "@/lib/sheets.functions";
 import type { OrcamentoMes, OrcamentoOrganizacao } from "@/lib/sheets.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ function organizationAnswer(data: OrcamentoMes, name: string): OrcamentoOrganiza
   );
 }
 
-function answerQuestion(question: string, data: OrcamentoMes): string {
+function parseMoney(value: string): number {\n  const raw = value.replace(/[^0-9,-]/g, "").replace(/\\./g, "").replace(",", ".");\n  const parsed = Number.parseFloat(raw);\n  return Number.isFinite(parsed) ? parsed : 0;\n}\n\nfunction answerQuestion(question: string, data: OrcamentoMes): string {
   const q = question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   if (q.includes("esta semana")) {
@@ -171,7 +171,6 @@ function Orcamento() {
   const [answer, setAnswer] = useState("");
 
   const selectedSlug = mesSlug || mesesQuery.data?.meses[0]?.slug || "";
-  const selectedMonth = mesesQuery.data?.meses.find((mes) => mes.slug === selectedSlug);
 
   const relatorioQuery = useQuery({
     queryKey: ["orcamento-mes", selectedSlug],
