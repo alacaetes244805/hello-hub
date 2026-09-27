@@ -83,7 +83,60 @@ function toLancamento(row: string[], index: number): Lancamento {
   };
 }
 
+export const getOrcamentoMeses = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const response = await fetch(
+      `${gatewayBase().replace("/values", "")}?fields=sheets.properties.title`,
+      { headers: gatewayHeaders() },
+    );
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(`Sheets metadata read failed [${response.status}]: ${body}`);
+      throw new Error(`Falha ao descobrir as abas mensais [${response.status}]`);
+    }
+    const json = (await response.json()) as {
+      sheets?: Array<{ properties?: { title?: string } }>;
+    };
+    const meses = (json.sheets ?? [])
+      .map((sheet) => sheet.properties?.title ?? "")
+      .filter(isMonthlyTab)
+      .map((nome) => ({ nome, slug: normalizeTabName(nome) }));
+    return { meses };
+  },
+);
+
+export const getOrcamentoMes = createServerFn({ method: "GET" })
+  .inputValidator((data: { nome: string }) => data)
+  .handler(async ({ data }) => {
+    if (!isMonthlyTab(data.nome)) {
+      throw new Error("Aba mensal inválida");
+    }
+    const rows = await readSheetRange(data.nome);
+    const organizacoes = normalizeBudgetRows(rows);
+    const totalOrcamento = organizacoes.reduce(
+      (sum, item) => sum + numberValue(item.orcamento),
+      0,
+    );
+    const totalUtilizado = organizacoes.reduce(
+      (sum, item) => sum + numberValue(item.utilizado),
+      0,
+    );
+    const totalRestante = organizacoes.reduce(
+      (sum, item) => sum + numberValue(item.restante),
+      0,
+    );
+    return {
+      nome: data.nome,
+      slug: normalizeTabName(data.nome),
+      organizacoes,
+      totalOrcamento: formatMoney(totalOrcamento),
+      totalUtilizado: formatMoney(totalUtilizado),
+      totalRestante: formatMoney(totalRestante),
+    } satisfies OrcamentoMes;
+  });
+
 export const getLancamentos = createServerFn({ method: "GET" }).handler(
+
   async () => {
     const rows = await readRows();
     const entries = rows
