@@ -181,12 +181,40 @@ export const getOrcamentoMeses = createServerFn({ method: "GET" }).handler(
 );
 
 export const getOrcamentoMes = createServerFn({ method: "GET" })
-  .inputValidator((data: { nome: string }) => data)
+  .inputValidator((data: { nome: string; slug?: string }) => data)
   .handler(async ({ data }) => {
-    if (!isMonthlyTab(data.nome)) {
+    // Resolve o título real da aba no Sheets quando a rota fornecer apenas o slug.
+    // Isso preserva acentos e evita falhas como "Março" -> "Marco".
+    let nomeAba = data.nome;
+
+    if (!isMonthlyTab(nomeAba) && data.slug) {
+      const response = await fetch(
+        gatewayBase().replace("/values", "") +
+          "?fields=sheets.properties.title",
+        { headers: gatewayHeaders() },
+      );
+      if (!response.ok) {
+        throw new Error("Não foi possível localizar a aba mensal");
+      }
+
+      const json = (await response.json()) as {
+        sheets?: Array<{ properties?: { title?: string } }>;
+      };
+
+      nomeAba =
+        (json.sheets ?? [])
+          .map((sheet) => sheet.properties?.title ?? "")
+          .find(
+            (title) =>
+              isMonthlyTab(title) && normalizeTabName(title) === data.slug,
+          ) ?? "";
+    }
+
+    if (!isMonthlyTab(nomeAba)) {
       throw new Error("Aba mensal inválida");
     }
-    const rows = await readSheetRange(data.nome);
+
+    const rows = await readSheetRange(nomeAba);
     const organizacoes = normalizeBudgetRows(rows);
     const totalOrcamento = organizacoes.reduce(
       (sum, item) => sum + numberValue(item.orcamento),
@@ -201,8 +229,8 @@ export const getOrcamentoMes = createServerFn({ method: "GET" })
       0,
     );
     return {
-      nome: data.nome,
-      slug: normalizeTabName(data.nome),
+      nome: nomeAba,
+      slug: normalizeTabName(nomeAba),
       organizacoes,
       totalOrcamento: formatMoney(totalOrcamento),
       totalUtilizado: formatMoney(totalUtilizado),
