@@ -262,9 +262,9 @@ export const getOrcamentoMes = createServerFn({ method: "GET" })
       nome: nomeAba,
       slug: normalizeTabName(nomeAba),
       organizacoes,
-      totalOrcamento: formatMoney(totalOrcamento),
-      totalUtilizado: formatMoney(totalUtilizado),
-      totalRestante: formatMoney(totalRestante),
+      totalOrcamento,
+      totalUtilizado,
+      totalRestante,
     } satisfies OrcamentoMes;
   });
 
