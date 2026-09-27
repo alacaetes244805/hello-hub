@@ -16,6 +16,24 @@ export type Lancamento = {
   pagamento: string;
 };
 
+export type OrcamentoOrganizacao = {
+  organizacao: string;
+  orcamento: string;
+  semanas: string[];
+  utilizado: string;
+  restante: string;
+};
+
+export type OrcamentoMes = {
+  nome: string;
+  slug: string;
+  organizacoes: OrcamentoOrganizacao[];
+  totalOrcamento: string;
+  totalUtilizado: string;
+  totalRestante: string;
+};
+
+
 function gatewayBase() {
   return `https://connector-gateway.lovable.dev/google_sheets/v4/spreadsheets/${SPREADSHEET_ID}/values`;
 }
@@ -32,6 +50,95 @@ function gatewayHeaders() {
     "Content-Type": "application/json",
   };
 }
+
+async function readSheetRange(sheetName: string): Promise<string[][]> {
+  const range = `'${sheetName.replaceAll("'", "''")}'!A1:Z200`;
+  const res = await fetch(`${gatewayBase()}/${range}`, {
+    headers: gatewayHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`Sheets budget read failed [${res.status}]: ${body}`);
+    throw new Error(`Falha ao ler a aba de orçamento [${res.status}]`);
+  }
+  const json = (await res.json()) as { values?: string[][] };
+  return json.values ?? [];
+}
+
+function normalizeTabName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\\s+/g, "-");
+}
+
+function isMonthlyTab(value: string): boolean {
+  return /^(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+\\d{4}$/i.test(
+    value.trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, ""),
+  );
+}
+
+function numberValue(value: string): number {
+  const normalized = value
+    .replace(/R\\$\\s?/i, "")
+    .replace(/\\./g, "")
+    .replace(",", ".")
+    .replace(/[^\\d.-]/g, "");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatMoney(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+function headerIndex(headers: string[], names: string[]): number {
+  return headers.findIndex((header) => {
+    const normalized = header
+      .normalize("NFD")
+      .replace(/[\\u0300-\\u036f]/g, "")
+      .toLowerCase();
+    return names.some((name) => normalized.includes(name));
+  });
+}
+
+function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
+  const headerRowIndex = rows.findIndex((row) =>
+    row.some((cell) => /organiz|orcamento|orçamento/i.test(cell)),
+  );
+  if (headerRowIndex < 0) return [];
+
+  const headers = rows[headerRowIndex] ?? [];
+  const organizationIndex = headerIndex(headers, ["organiz"]);
+  const budgetIndex = headerIndex(headers, ["orcamento", "orçamento"]);
+  const usedIndex = headerIndex(headers, ["utilizado", "gasto", "total"]);
+  const remainingIndex = headerIndex(headers, ["restante", "saldo"]);
+  const weekIndexes = headers
+    .map((header, index) => (/semana|\\bS[1-5]\\b/i.test(header) ? index : -1))
+    .filter((index) => index >= 0);
+
+  if (organizationIndex < 0) return [];
+  return rows
+    .slice(headerRowIndex + 1)
+    .filter((row) => (row[organizationIndex] ?? "").trim())
+    .map((row) => {
+      const semanas = weekIndexes.map((index) => row[index] ?? "");
+      const utilizado = usedIndex >= 0 ? row[usedIndex] ?? "" : formatMoney(semanas.reduce((sum, value) => sum + numberValue(value), 0));
+      return {
+        organizacao: (row[organizationIndex] ?? "").trim(),
+        orcamento: budgetIndex >= 0 ? row[budgetIndex] ?? "" : "",
+        semanas,
+        utilizado,
+        restante: remainingIndex >= 0 ? row[remainingIndex] ?? "" : "",
+      };
+    });
+}
+
 
 async function readRows(): Promise<string[][]> {
   const res = await fetch(`${gatewayBase()}/${READ_RANGE}`, {
@@ -65,7 +172,60 @@ function toLancamento(row: string[], index: number): Lancamento {
   };
 }
 
+export const getOrcamentoMeses = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const response = await fetch(
+      `${gatewayBase().replace("/values", "")}?fields=sheets.properties.title`,
+      { headers: gatewayHeaders() },
+    );
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(`Sheets metadata read failed [${response.status}]: ${body}`);
+      throw new Error(`Falha ao descobrir as abas mensais [${response.status}]`);
+    }
+    const json = (await response.json()) as {
+      sheets?: Array<{ properties?: { title?: string } }>;
+    };
+    const meses = (json.sheets ?? [])
+      .map((sheet) => sheet.properties?.title ?? "")
+      .filter(isMonthlyTab)
+      .map((nome) => ({ nome, slug: normalizeTabName(nome) }));
+    return { meses };
+  },
+);
+
+export const getOrcamentoMes = createServerFn({ method: "GET" })
+  .inputValidator((data: { nome: string }) => data)
+  .handler(async ({ data }) => {
+    if (!isMonthlyTab(data.nome)) {
+      throw new Error("Aba mensal inválida");
+    }
+    const rows = await readSheetRange(data.nome);
+    const organizacoes = normalizeBudgetRows(rows);
+    const totalOrcamento = organizacoes.reduce(
+      (sum, item) => sum + numberValue(item.orcamento),
+      0,
+    );
+    const totalUtilizado = organizacoes.reduce(
+      (sum, item) => sum + numberValue(item.utilizado),
+      0,
+    );
+    const totalRestante = organizacoes.reduce(
+      (sum, item) => sum + numberValue(item.restante),
+      0,
+    );
+    return {
+      nome: data.nome,
+      slug: normalizeTabName(data.nome),
+      organizacoes,
+      totalOrcamento: formatMoney(totalOrcamento),
+      totalUtilizado: formatMoney(totalUtilizado),
+      totalRestante: formatMoney(totalRestante),
+    } satisfies OrcamentoMes;
+  });
+
 export const getLancamentos = createServerFn({ method: "GET" }).handler(
+
   async () => {
     const rows = await readRows();
     const entries = rows
