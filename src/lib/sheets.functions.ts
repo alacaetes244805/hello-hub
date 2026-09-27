@@ -94,7 +94,8 @@ export const addLancamento = createServerFn({ method: "POST" })
     // First placeholder row (1-indexed, including header row offset)
     let targetRow = -1;
     for (let i = 1; i < rows.length; i++) {
-      if (isPlaceholderRow(rows[i])) {
+      const row = rows[i];
+      if (row && isPlaceholderRow(row)) {
         targetRow = i + 1;
         break;
       }

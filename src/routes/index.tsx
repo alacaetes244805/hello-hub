@@ -79,13 +79,13 @@ function Index() {
   const fetchLancamentos = useServerFn(getLancamentos);
   const submitLancamento = useServerFn(addLancamento);
 
-  const { data, isFetching, refetch } = useQuery({
+  const { data: resultado, isFetching, refetch } = useQuery({
     queryKey: ["lancamentos"],
     queryFn: () => fetchLancamentos(),
   });
 
   const [organizacao, setOrganizacao] = useState("");
-  const [data, setData] = useState(todayBR());
+  const [dataLanc, setDataLanc] = useState(todayBR());
   const [tipo, setTipo] = useState<"ENTRADA" | "SAÍDA">("SAÍDA");
   const [valor, setValor] = useState("");
   const [finalidade, setFinalidade] = useState("");
@@ -98,7 +98,7 @@ function Index() {
       toast.error("Selecione a organização");
       return;
     }
-    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(data)) {
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataLanc)) {
       toast.error("Data inválida — use dd/mm/aaaa");
       return;
     }
@@ -117,7 +117,7 @@ function Index() {
         data: {
           codigo: org.codigo,
           organizacao: org.nome,
-          data,
+          data: dataLanc,
           tipo,
           valor,
           finalidade: finalidade.trim(),
@@ -136,7 +136,7 @@ function Index() {
     }
   }
 
-  const lancamentos = data?.lancamentos ?? [];
+  const lancamentos = resultado?.lancamentos ?? [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -185,8 +185,8 @@ function Index() {
                   <Label htmlFor="data">Data</Label>
                   <Input
                     id="data"
-                    value={data}
-                    onChange={(e) => setData(e.target.value)}
+                    value={dataLanc}
+                    onChange={(e) => setDataLanc(e.target.value)}
                     placeholder="dd/mm/aaaa"
                     inputMode="numeric"
                   />
