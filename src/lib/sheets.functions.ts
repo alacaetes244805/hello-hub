@@ -141,13 +141,9 @@ function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
     const budget = cleanName(row[2] ?? "");
     return org.includes("organizacao") && budget.includes("orcamento");
   });
-  if (headerRowIndex < 0) {
-    throw new Error(
-      "A aba mensal foi lida, mas o cabeçalho do orçamento não foi encontrado nas colunas B e C (Organização e Orçamento).",
-    );
-  }
+  const startIndex = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
 
-  const parsed = rows.slice(headerRowIndex + 1)
+  const parsed = rows.slice(startIndex)
     .map((row) => {
       const nome = (row[1] ?? "").trim();
       if (!nome) return null;
