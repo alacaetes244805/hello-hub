@@ -203,25 +203,13 @@ export const getOrcamentoMes = createServerFn({ method: "GET" })
     }
     const rows = await readSheetRange(data.nome);
     const organizacoes = normalizeBudgetRows(rows);
-    const totalOrcamento = organizacoes.reduce(
-      (sum, item) => sum + numberValue(item.orcamento),
-      0,
-    );
-    const totalUtilizado = organizacoes.reduce(
-      (sum, item) => sum + numberValue(item.utilizado),
-      0,
-    );
-    const totalRestante = organizacoes.reduce(
-      (sum, item) => sum + numberValue(item.restante),
-      0,
-    );
-    return {
+        return {
       nome: data.nome,
       slug: normalizeTabName(data.nome),
       organizacoes,
-      totalOrcamento: formatMoney(totalOrcamento),
-      totalUtilizado: formatMoney(totalUtilizado),
-      totalRestante: formatMoney(totalRestante),
+      totalOrcamento: summaryValue(rows, 2),
+      totalUtilizado: summaryValue(rows, 8),
+      totalRestante: summaryValue(rows, 9),
     } satisfies OrcamentoMes;
   });
 
