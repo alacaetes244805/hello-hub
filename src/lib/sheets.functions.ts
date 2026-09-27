@@ -55,7 +55,7 @@ function gatewayHeaders() {
 
 async function readSheetRange(sheetName: string): Promise<string[][]> {
   const range = `'${sheetName.replaceAll("'", "''")}'!A1:Z200`;
-  const res = await fetch(`${gatewayBase()}/${range}`, {
+  const res = await fetch(`${gatewayBase()}/${encodeURIComponent(range)}`, {
     headers: gatewayHeaders(),
   });
   if (!res.ok) {
@@ -103,7 +103,7 @@ function headerIndex(headers: string[], names: string[]): number {
   return headers.findIndex((header) => {
     const normalized = header
       .normalize("NFD")
-      .replace(/[\\u0300-\\u036f]/g, "")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
     return names.some((name) => normalized.includes(name));
   });
@@ -120,11 +120,16 @@ function moneyCell(value: string | undefined): string {
 
 function findSummaryValue(rows: string[][], labels: string[], columns: number[]): string {
   const wanted = labels.map(cleanName);
-  for (let r = 14; r <= 16 && r < rows.length; r++) {
+  // O resumo está documentado nas linhas 15:17, mas procuramos em toda a
+  // área lida para tolerar pequenas mudanças de formatação na aba mensal.
+  for (let r = 0; r < rows.length; r++) {
     const row = rows[r] ?? [];
     const labelText = row.slice(0, 3).map((v) => cleanName(v ?? "")).join(" ");
-    if (wanted.some((label) => labelText.includes(label))) {
-      for (const column of columns) if ((row[column] ?? "").trim()) return moneyCell(row[column]);
+    if (!wanted.some((label) => labelText.includes(label))) continue;
+
+    for (const column of columns) {
+      const value = (row[column] ?? "").trim();
+      if (value !== "") return moneyCell(value);
     }
   }
   return "";
@@ -134,7 +139,14 @@ function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
   const headerRowIndex = rows.findIndex((row) => {
     const org = cleanName(row[1] ?? "");
     const budget = cleanName(row[2] ?? "");
-    return org.includes("organizacao") && budget.includes("orcamento");
+    const week1 = cleanName(row[3] ?? "");
+    const total = cleanName(row[8] ?? "");
+    return (
+      org.includes("organizacao") &&
+      budget.includes("orcamento") &&
+      week1.includes("semana") &&
+      total.includes("total")
+    );
   });
   if (headerRowIndex < 0) return [];
 
