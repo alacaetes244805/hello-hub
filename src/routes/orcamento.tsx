@@ -242,12 +242,38 @@ function Orcamento() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
-        {mesesQuery.isLoading || relatorioQuery.isLoading ? (
+        {mesesQuery.isLoading ? (
           <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando dados da planilha...
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Localizando as abas mensais...
+          </div>
+        ) : mesesQuery.isError ? (
+          <Card>
+            <CardContent className="p-6 text-center">
+              <p className="font-medium text-destructive">Não foi possível localizar as abas mensais.</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Verifique a conexão/autorização do Google Sheets e tente novamente.
+              </p>
+            </CardContent>
+          </Card>
+        ) : !mesesQuery.data?.meses.length ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              Nenhuma aba mensal foi encontrada na planilha.
+            </CardContent>
+          </Card>
+        ) : relatorioQuery.isLoading ? (
+          <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando Setembro 2026...
           </div>
         ) : relatorioQuery.isError ? (
-          <Card><CardContent className="p-6 text-center text-destructive">Não foi possível carregar os dados da planilha. Verifique a conexão do Google Sheets e tente novamente.</CardContent></Card>
+          <Card>
+            <CardContent className="p-6 text-center">
+              <p className="font-medium text-destructive">A aba {mesesQuery.data?.meses.find((mes) => mes.slug === selectedSlug)?.nome ?? selectedSlug} foi localizada, mas os dados não puderam ser carregados.</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Verifique se a aba contém as colunas B:J do orçamento e se a integração com o Google Sheets está autorizada.
+              </p>
+            </CardContent>
+          </Card>
         ) : relatorio ? (
           <>
             <section className="grid gap-4 md:grid-cols-3">
