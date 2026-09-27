@@ -110,18 +110,12 @@ function headerIndex(headers: string[], names: string[]): number {
 }
 
 function cleanName(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/\\s+/g, " ");
+  return value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim().replace(/\\s+/g, " ");
 }
 
 function moneyCell(value: string | undefined): string {
   const raw = (value ?? "").trim();
-  if (!raw) return "";
-  return formatMoney(numberValue(raw));
+  return raw ? formatMoney(numberValue(raw)) : "";
 }
 
 function findSummaryValue(rows: string[][], labels: string[], columns: number[]): string {
@@ -146,8 +140,7 @@ function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
   });
   if (headerRowIndex < 0) return [];
 
-  const parsed = rows
-    .slice(headerRowIndex + 1)
+  const parsed = rows.slice(headerRowIndex + 1)
     .map((row) => {
       const nome = (row[1] ?? "").trim();
       if (!nome) return null;
@@ -161,32 +154,22 @@ function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
       };
     })
     .filter((item): item is OrcamentoOrganizacao => Boolean(item))
-    .filter((item) => {
-      const n = cleanName(item.organizacao);
-      return !["organizacao", "total", "totais", "orcamento inicial", "total gasto", "orcamento restante"].includes(n);
-    });
+    .filter((item) => !["organizacao","total","totais","orcamento inicial","total gasto","orcamento restante"].includes(cleanName(item.organizacao)));
 
   const secretaria = parsed.find((item) => cleanName(item.organizacao) === "secretaria");
   if (!secretaria) return parsed;
 
-  const subNames = new Set(["agua mineral", "centro de distribuicao", "obra missionaria", "thf"]);
-  const subcategorias = parsed
-    .filter((item) => subNames.has(cleanName(item.organizacao)))
-    .map((item) => ({ ...item, tipo: "subcategoria" as const }));
-
+  const subNames = new Set(["agua mineral","centro de distribuicao","obra missionaria","thf"]);
   secretaria.tipo = "grupo";
-  secretaria.subcategorias = subcategorias;
+  secretaria.subcategorias = parsed.filter((item) => subNames.has(cleanName(item.organizacao)))
+    .map((item) => ({ ...item, tipo: "subcategoria" as const }));
 
   return parsed.filter((item) => !subNames.has(cleanName(item.organizacao)));
 }    const rows = await readSheetRange(nomeAba);
     const organizacoes = normalizeBudgetRows(rows);
-
-    // Os cards superiores usam os valores do bloco de resumo da própria aba.
-    // Não recalculamos esses totais a partir das organizações.
     const totalOrcamento = findSummaryValue(rows, ["orcamento inicial"], [2]);
     const totalUtilizado = findSummaryValue(rows, ["total gasto"], [8, 2]);
     const totalRestante = findSummaryValue(rows, ["orcamento restante"], [9, 2]);
-
     return {
         organizacao: nome,
         orcamento: moneyCell(row[2]),
@@ -197,21 +180,15 @@ function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
       };
     })
     .filter((item): item is OrcamentoOrganizacao => Boolean(item))
-    .filter((item) => {
-      const n = cleanName(item.organizacao);
-      return !["organizacao", "total", "totais", "orcamento inicial", "total gasto", "orcamento restante"].includes(n);
-    });
+    .filter((item) => !["organizacao","total","totais","orcamento inicial","total gasto","orcamento restante"].includes(cleanName(item.organizacao)));
 
   const secretaria = parsed.find((item) => cleanName(item.organizacao) === "secretaria");
   if (!secretaria) return parsed;
 
-  const subNames = new Set(["agua mineral", "centro de distribuicao", "obra missionaria", "thf"]);
-  const subcategorias = parsed
-    .filter((item) => subNames.has(cleanName(item.organizacao)))
-    .map((item) => ({ ...item, tipo: "subcategoria" as const }));
-
+  const subNames = new Set(["agua mineral","centro de distribuicao","obra missionaria","thf"]);
   secretaria.tipo = "grupo";
-  secretaria.subcategorias = subcategorias;
+  secretaria.subcategorias = parsed.filter((item) => subNames.has(cleanName(item.organizacao)))
+    .map((item) => ({ ...item, tipo: "subcategoria" as const }));
 
   return parsed.filter((item) => !subNames.has(cleanName(item.organizacao)));
 }
