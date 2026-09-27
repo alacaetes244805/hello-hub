@@ -81,7 +81,7 @@ async function answerComparison(
   question: string,
   data: OrcamentoMes,
   meses: Array<{ nome: string; slug: string }>,
-  fetchMes: ReturnType<typeof useServerFn<typeof getOrcamentoMes>>,
+  fetchMes: (args: { data: { nome: string; slug?: string } }) => Promise<OrcamentoMes>,
 ): Promise<string | null> {
   const q = question.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
   if (!q.includes("compare") && !q.includes("comparar") && !q.includes("mes")) return null;
