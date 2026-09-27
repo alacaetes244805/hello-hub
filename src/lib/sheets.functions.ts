@@ -139,16 +139,13 @@ function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
   const headerRowIndex = rows.findIndex((row) => {
     const org = cleanName(row[1] ?? "");
     const budget = cleanName(row[2] ?? "");
-    const week1 = cleanName(row[3] ?? "");
-    const total = cleanName(row[8] ?? "");
-    return (
-      org.includes("organizacao") &&
-      budget.includes("orcamento") &&
-      week1.includes("semana") &&
-      total.includes("total")
-    );
+    return org.includes("organizacao") && budget.includes("orcamento");
   });
-  if (headerRowIndex < 0) return [];
+  if (headerRowIndex < 0) {
+    throw new Error(
+      "A aba mensal foi lida, mas o cabeçalho do orçamento não foi encontrado nas colunas B e C (Organização e Orçamento).",
+    );
+  }
 
   const parsed = rows.slice(headerRowIndex + 1)
     .map((row) => {
@@ -265,6 +262,9 @@ export const getOrcamentoMes = createServerFn({ method: "GET" })
     }
 
     const rows = await readSheetRange(nomeAba);
+    if (rows.length === 0) {
+      throw new Error(`A aba "${nomeAba}" foi encontrada, mas o Google Sheets retornou 0 linhas.`);
+    }
     const organizacoes = normalizeBudgetRows(rows);
     const totalOrcamento = findSummaryValue(rows, ["orcamento inicial"], [2]);
     const totalUtilizado = findSummaryValue(rows, ["total gasto"], [8, 2]);
