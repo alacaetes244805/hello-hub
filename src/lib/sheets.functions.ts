@@ -157,7 +157,12 @@ function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
       };
     })
     .filter((item): item is OrcamentoOrganizacao => Boolean(item))
-    .filter((item) => !["organizacao","total","totais","orcamento inicial","total gasto","orcamento restante"].includes(cleanName(item.organizacao)));
+    .filter((item) => {
+      const nome = cleanName(item.organizacao);
+      const ignorar = ["organizacao","organizacoes","organizações","total","totais","orcamento inicial","total gasto","orcamento restante"].includes(nome);
+      const temValor = Boolean(item.orcamento || item.utilizado || item.restante || item.semanas.some(Boolean));
+      return !ignorar && temValor;
+    });
 
   const secretaria = parsed.find((item) => cleanName(item.organizacao) === "secretaria");
   if (!secretaria) return parsed;
