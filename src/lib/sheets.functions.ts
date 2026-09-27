@@ -113,30 +113,16 @@ function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
   );
   if (headerRowIndex < 0) return [];
 
-  const headers = rows[headerRowIndex] ?? [];
-  const organizationIndex = headerIndex(headers, ["organiz"]);
-  const budgetIndex = headerIndex(headers, ["orcamento", "orçamento"]);
-  const usedIndex = headerIndex(headers, ["utilizado", "gasto", "total"]);
-  const remainingIndex = headerIndex(headers, ["restante", "saldo"]);
-  const weekIndexes = headers
-    .map((header, index) => (/semana|\\bS[1-5]\\b/i.test(header) ? index : -1))
-    .filter((index) => index >= 0);
-
-  if (organizationIndex < 0) return [];
   return rows
     .slice(headerRowIndex + 1)
-    .filter((row) => (row[organizationIndex] ?? "").trim())
-    .map((row) => {
-      const semanas = weekIndexes.map((index) => row[index] ?? "");
-      const utilizado = usedIndex >= 0 ? row[usedIndex] ?? "" : formatMoney(semanas.reduce((sum, value) => sum + numberValue(value), 0));
-      return {
-        organizacao: (row[organizationIndex] ?? "").trim(),
-        orcamento: budgetIndex >= 0 ? row[budgetIndex] ?? "" : "",
-        semanas,
-        utilizado,
-        restante: remainingIndex >= 0 ? row[remainingIndex] ?? "" : "",
-      };
-    });
+    .filter((row) => (row[1] ?? "").trim())
+    .map((row) => ({
+      organizacao: (row[1] ?? "").trim(),
+      orcamento: row[2] ?? "",
+      semanas: [row[3] ?? "", row[4] ?? "", row[5] ?? "", row[6] ?? "", row[7] ?? ""],
+      utilizado: row[8] ?? "",
+      restante: row[9] ?? "",
+    }));
 }
 
 
