@@ -77,6 +77,35 @@ function parseMoney(value: string): number {\n  const raw = value.replace(/[^0-9
   return "Não encontrei essa informação nos dados disponíveis.";
 }
 
+async function answerComparison(
+  question: string,
+  data: OrcamentoMes,
+  meses: Array<{ nome: string; slug: string }>,
+  fetchMes: ReturnType<typeof useServerFn<typeof getOrcamentoMes>>,
+): Promise<string | null> {
+  const q = question.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+  if (!q.includes("compare") && !q.includes("comparar") && !q.includes("mes")) return null;
+
+  const matches = meses.filter((mes) => {
+    const normalized = mes.nome.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+    return q.includes(normalized);
+  });
+  const unique = matches.filter((mes, index, arr) => arr.findIndex((x) => x.slug === mes.slug) === index);
+  if (unique.length < 2) return null;
+
+  const first = unique[0];
+  const second = unique[1];
+  const [a, b] = await Promise.all([
+    first.slug === data.slug ? Promise.resolve(data) : fetchMes({ data: { nome: first.slug, slug: first.slug } }),
+    second.slug === data.slug ? Promise.resolve(data) : fetchMes({ data: { nome: second.slug, slug: second.slug } }),
+  ]);
+
+  const gastoA = parseMoney(a.totalUtilizado);
+  const gastoB = parseMoney(b.totalUtilizado);
+  const diferenca = Math.abs(gastoA - gastoB).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return `${a.nome}: ${a.totalUtilizado} · ${b.nome}: ${b.totalUtilizado} · Diferença: ${diferenca}`;
+}
+
 function Money({ value }: { value: string }) {
   return <span className="font-semibold tabular-nums">{displayMoney(value)}</span>;
 }
@@ -168,7 +197,7 @@ function Orcamento() {
   const mesesQuery = useQuery({ queryKey: ["orcamento-meses"], queryFn: () => fetchMeses() });
   const [mesSlug, setMesSlug] = useState("");
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
+  const [answer, setAnswer] = useState("");\n  const [questionLoading, setQuestionLoading] = useState(false);
 
   const selectedSlug = mesSlug || mesesQuery.data?.meses[0]?.slug || "";
 
@@ -243,11 +272,11 @@ function Orcamento() {
                   <input
                     value={question}
                     onChange={(event) => setQuestion(event.target.value)}
-                    onKeyDown={(event) => { if (event.key === "Enter" && question.trim()) setAnswer(answerQuestion(question, relatorio)); }}
+                    onKeyDown={async (event) => { if (event.key === "Enter" && question.trim()) { setQuestionLoading(true); const comparison = await answerComparison(question, relatorio, mesesQuery.data?.meses ?? [], fetchMes); setAnswer(comparison ?? answerQuestion(question, relatorio)); setQuestionLoading(false); } }}
                     placeholder="Ex.: Quanto gastamos na Semana 2?"
                     className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                   />
-                  <button type="button" onClick={() => question.trim() && setAnswer(answerQuestion(question, relatorio))} className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                  <button type="button" onClick={async () => { if (!question.trim()) return; setQuestionLoading(true); const comparison = await answerComparison(question, relatorio, mesesQuery.data?.meses ?? [], fetchMes); setAnswer(comparison ?? answerQuestion(question, relatorio)); setQuestionLoading(false); }} className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
                     Consultar
                   </button>
                 </div>
