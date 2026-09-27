@@ -212,7 +212,7 @@ function toLancamento(row: string[], index: number): Lancamento {
 export const getOrcamentoMeses = createServerFn({ method: "GET" }).handler(
   async () => {
     const response = await fetch(
-      `${gatewayBase().replace("/values", "")}?fields=sheets.properties.title`,
+      gatewayBase().replace("/values", ""),
       { headers: gatewayHeaders() },
     );
     if (!response.ok) {
@@ -240,8 +240,7 @@ export const getOrcamentoMes = createServerFn({ method: "GET" })
 
     if (!isMonthlyTab(nomeAba) && data.slug) {
       const response = await fetch(
-        gatewayBase().replace("/values", "") +
-          "?fields=sheets.properties.title",
+        gatewayBase().replace("/values", ""),
         { headers: gatewayHeaders() },
       );
       if (!response.ok) {
