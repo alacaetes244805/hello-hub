@@ -28,7 +28,13 @@ function organizationAnswer(data: OrcamentoMes, name: string): OrcamentoOrganiza
   );
 }
 
-function parseMoney(value: string): number {\n  const raw = value.replace(/[^0-9,-]/g, "").replace(/\\./g, "").replace(",", ".");\n  const parsed = Number.parseFloat(raw);\n  return Number.isFinite(parsed) ? parsed : 0;\n}\n\nfunction answerQuestion(question: string, data: OrcamentoMes): string {
+function parseMoney(value: string): number {
+  const raw = value.replace(/[^0-9,-]/g, "").replace(/\\./g, "").replace(",", ".");
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function answerQuestion(question: string, data: OrcamentoMes): string {
   const q = question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   if (q.includes("esta semana")) {
@@ -197,7 +203,8 @@ function Orcamento() {
   const mesesQuery = useQuery({ queryKey: ["orcamento-meses"], queryFn: () => fetchMeses() });
   const [mesSlug, setMesSlug] = useState("");
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");\n  const [questionLoading, setQuestionLoading] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const [questionLoading, setQuestionLoading] = useState(false);
 
   const selectedSlug = mesSlug || mesesQuery.data?.meses[0]?.slug || "";
 
