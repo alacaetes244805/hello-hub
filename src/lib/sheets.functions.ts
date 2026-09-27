@@ -17,9 +17,10 @@ export type Lancamento = {
 };
 
 export type OrcamentoOrganizacao = {
+  linha: number;
   organizacao: string;
   orcamento: string;
-  semanas: string[];
+  semanas: [string, string, string, string, string];
   utilizado: string;
   restante: string;
 };
