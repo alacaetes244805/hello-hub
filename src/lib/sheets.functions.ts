@@ -51,6 +51,95 @@ function gatewayHeaders() {
   };
 }
 
+async function readSheetRange(sheetName: string): Promise<string[][]> {
+  const range = `'${sheetName.replaceAll("'", "''")}'!A1:Z200`;
+  const res = await fetch(`${gatewayBase()}/${range}`, {
+    headers: gatewayHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`Sheets budget read failed [${res.status}]: ${body}`);
+    throw new Error(`Falha ao ler a aba de orçamento [${res.status}]`);
+  }
+  const json = (await res.json()) as { values?: string[][] };
+  return json.values ?? [];
+}
+
+function normalizeTabName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\\s+/g, "-");
+}
+
+function isMonthlyTab(value: string): boolean {
+  return /^(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+\\d{4}$/i.test(
+    value.trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, ""),
+  );
+}
+
+function numberValue(value: string): number {
+  const normalized = value
+    .replace(/R\\$\\s?/i, "")
+    .replace(/\\./g, "")
+    .replace(",", ".")
+    .replace(/[^\\d.-]/g, "");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatMoney(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+function headerIndex(headers: string[], names: string[]): number {
+  return headers.findIndex((header) => {
+    const normalized = header
+      .normalize("NFD")
+      .replace(/[\\u0300-\\u036f]/g, "")
+      .toLowerCase();
+    return names.some((name) => normalized.includes(name));
+  });
+}
+
+function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
+  const headerRowIndex = rows.findIndex((row) =>
+    row.some((cell) => /organiz|orcamento|orçamento/i.test(cell)),
+  );
+  if (headerRowIndex < 0) return [];
+
+  const headers = rows[headerRowIndex] ?? [];
+  const organizationIndex = headerIndex(headers, ["organiz"]);
+  const budgetIndex = headerIndex(headers, ["orcamento", "orçamento"]);
+  const usedIndex = headerIndex(headers, ["utilizado", "gasto", "total"]);
+  const remainingIndex = headerIndex(headers, ["restante", "saldo"]);
+  const weekIndexes = headers
+    .map((header, index) => (/semana|\\bS[1-5]\\b/i.test(header) ? index : -1))
+    .filter((index) => index >= 0);
+
+  if (organizationIndex < 0) return [];
+  return rows
+    .slice(headerRowIndex + 1)
+    .filter((row) => (row[organizationIndex] ?? "").trim())
+    .map((row) => {
+      const semanas = weekIndexes.map((index) => row[index] ?? "");
+      const utilizado = usedIndex >= 0 ? row[usedIndex] ?? "" : formatMoney(semanas.reduce((sum, value) => sum + numberValue(value), 0));
+      return {
+        organizacao: (row[organizationIndex] ?? "").trim(),
+        orcamento: budgetIndex >= 0 ? row[budgetIndex] ?? "" : "",
+        semanas,
+        utilizado,
+        restante: remainingIndex >= 0 ? row[remainingIndex] ?? "" : "",
+      };
+    });
+}
+
+
 async function readRows(): Promise<string[][]> {
   const res = await fetch(`${gatewayBase()}/${READ_RANGE}`, {
     headers: gatewayHeaders(),
