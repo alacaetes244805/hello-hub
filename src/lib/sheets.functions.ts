@@ -22,6 +22,8 @@ export type OrcamentoOrganizacao = {
   semanas: string[];
   utilizado: string;
   restante: string;
+  tipo?: "organizacao" | "grupo" | "subcategoria";
+  subcategorias?: OrcamentoOrganizacao[];
 };
 
 export type OrcamentoMes = {
@@ -107,218 +109,109 @@ function headerIndex(headers: string[], names: string[]): number {
   });
 }
 
+function cleanName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\\s+/g, " ");
+}
+
+function moneyCell(value: string | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  return formatMoney(numberValue(raw));
+}
+
+function findSummaryValue(rows: string[][], labels: string[], columns: number[]): string {
+  const wanted = labels.map(cleanName);
+  for (let r = 14; r <= 16 && r < rows.length; r++) {
+    const row = rows[r] ?? [];
+    const labelText = row.slice(0, 3).map((v) => cleanName(v ?? "")).join(" ");
+    if (wanted.some((label) => labelText.includes(label))) {
+      for (const column of columns) {
+        if ((row[column] ?? "").trim()) return moneyCell(row[column]);
+      }
+    }
+  }
+  return "";
+}
+
 function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
-  const headerRowIndex = rows.findIndex((row) =>
-    row.some((cell) => /organiz|orcamento|orçamento/i.test(cell)),
-  );
+  const headerRowIndex = rows.findIndex((row) => {
+    const org = cleanName(row[1] ?? "");
+    const budget = cleanName(row[2] ?? "");
+    return org.includes("organizacao") && budget.includes("orcamento");
+  });
   if (headerRowIndex < 0) return [];
 
-  return rows
+  const parsed = rows
     .slice(headerRowIndex + 1)
-    .filter((row) => (row[1] ?? "").trim())
-    .map((row) => ({
-      organizacao: (row[1] ?? "").trim(),
-      orcamento: row[2] ?? "",
-      semanas: [row[3] ?? "", row[4] ?? "", row[5] ?? "", row[6] ?? "", row[7] ?? ""],
-      utilizado: row[8] ?? "",
-      restante: row[9] ?? "",
-    }));
-}
-
-
-async function readRows(): Promise<string[][]> {
-  const res = await fetch(`${gatewayBase()}/${READ_RANGE}`, {
-    headers: gatewayHeaders(),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`Sheets read failed [${res.status}]: ${body}`);
-    throw new Error(`Falha ao ler a planilha [${res.status}]`);
-  }
-  const json = (await res.json()) as { values?: string[][] };
-  return json.values ?? [];
-}
-
-function isPlaceholderRow(row: string[]): boolean {
-  const codigo = (row[0] ?? "").trim();
-  const data = (row[2] ?? "").trim();
-  return codigo === "0" || data === "0" || data === "";
-}
-
-function toLancamento(row: string[], index: number): Lancamento {
-  return {
-    row: index + 1,
-    codigo: row[0] ?? "",
-    organizacao: row[1] ?? "",
-    data: row[2] ?? "",
-    tipo: row[3] ?? "",
-    valor: row[4] ?? "",
-    finalidade: row[5] ?? "",
-    pagamento: row[7] ?? "",
-  };
-}
-
-export const getOrcamentoMeses = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const response = await fetch(
-      `${gatewayBase().replace("/values", "")}?fields=sheets.properties.title`,
-      { headers: gatewayHeaders() },
-    );
-    if (!response.ok) {
-      const body = await response.text();
-      console.error(`Sheets metadata read failed [${response.status}]: ${body}`);
-      throw new Error(`Falha ao descobrir as abas mensais [${response.status}]`);
-    }
-    const json = (await response.json()) as {
-      sheets?: Array<{ properties?: { title?: string } }>;
-    };
-    const meses = (json.sheets ?? [])
-      .map((sheet) => sheet.properties?.title ?? "")
-      .filter(isMonthlyTab)
-      .map((nome) => ({ nome, slug: normalizeTabName(nome) }));
-    return { meses };
-  },
-);
-
-export const getOrcamentoMes = createServerFn({ method: "GET" })
-  .inputValidator((data: { nome: string; slug?: string }) => data)
-  .handler(async ({ data }) => {
-    // Resolve o título real da aba no Sheets quando a rota fornecer apenas o slug.
-    // Isso preserva acentos e evita falhas como "Março" -> "Marco".
-    let nomeAba = data.nome;
-
-    if (!isMonthlyTab(nomeAba) && data.slug) {
-      const response = await fetch(
-        gatewayBase().replace("/values", "") +
-          "?fields=sheets.properties.title",
-        { headers: gatewayHeaders() },
-      );
-      if (!response.ok) {
-        throw new Error("Não foi possível localizar a aba mensal");
-      }
-
-      const json = (await response.json()) as {
-        sheets?: Array<{ properties?: { title?: string } }>;
+    .map((row) => {
+      const nome = (row[1] ?? "").trim();
+      if (!nome) return null;
+      return {
+        organizacao: nome,
+        orcamento: moneyCell(row[2]),
+        semanas: [3, 4, 5, 6, 7].map((i) => moneyCell(row[i])),
+        utilizado: moneyCell(row[8]),
+        restante: moneyCell(row[9]),
+        tipo: "organizacao" as const,
       };
+    })
+    .filter((item): item is OrcamentoOrganizacao => Boolean(item))
+    .filter((item) => {
+      const n = cleanName(item.organizacao);
+      return !["organizacao", "total", "totais", "orcamento inicial", "total gasto", "orcamento restante"].includes(n);
+    });
 
-      nomeAba =
-        (json.sheets ?? [])
-          .map((sheet) => sheet.properties?.title ?? "")
-          .find(
-            (title) =>
-              isMonthlyTab(title) && normalizeTabName(title) === data.slug,
-          ) ?? "";
-    }
+  const secretaria = parsed.find((item) => cleanName(item.organizacao) === "secretaria");
+  if (!secretaria) return parsed;
 
-    if (!isMonthlyTab(nomeAba)) {
-      throw new Error("Aba mensal inválida");
-    }
+  const subNames = new Set(["agua mineral", "centro de distribuicao", "obra missionaria", "thf"]);
+  const subcategorias = parsed
+    .filter((item) => subNames.has(cleanName(item.organizacao)))
+    .map((item) => ({ ...item, tipo: "subcategoria" as const }));
 
-    const rows = await readSheetRange(nomeAba);
+  secretaria.tipo = "grupo";
+  secretaria.subcategorias = subcategorias;
+
+  return parsed.filter((item) => !subNames.has(cleanName(item.organizacao)));
+}    const rows = await readSheetRange(nomeAba);
     const organizacoes = normalizeBudgetRows(rows);
-    const totalOrcamento = organizacoes.reduce(
-      (sum, item) => sum + numberValue(item.orcamento),
-      0,
-    );
-    const totalUtilizado = organizacoes.reduce(
-      (sum, item) => sum + numberValue(item.utilizado),
-      0,
-    );
-    const totalRestante = organizacoes.reduce(
-      (sum, item) => sum + numberValue(item.restante),
-      0,
-    );
+
+    // Os cards superiores usam os valores do bloco de resumo da própria aba.
+    // Não recalculamos esses totais a partir das organizações.
+    const totalOrcamento = findSummaryValue(rows, ["orcamento inicial"], [2]);
+    const totalUtilizado = findSummaryValue(rows, ["total gasto"], [8, 2]);
+    const totalRestante = findSummaryValue(rows, ["orcamento restante"], [9, 2]);
+
     return {
-      nome: nomeAba,
-      slug: normalizeTabName(nomeAba),
-      organizacoes,
-      totalOrcamento: formatMoney(totalOrcamento),
-      totalUtilizado: formatMoney(totalUtilizado),
-      totalRestante: formatMoney(totalRestante),
-    } satisfies OrcamentoMes;
-  });
+        organizacao: nome,
+        orcamento: moneyCell(row[2]),
+        semanas: [3, 4, 5, 6, 7].map((i) => moneyCell(row[i])),
+        utilizado: moneyCell(row[8]),
+        restante: moneyCell(row[9]),
+        tipo: "organizacao" as const,
+      };
+    })
+    .filter((item): item is OrcamentoOrganizacao => Boolean(item))
+    .filter((item) => {
+      const n = cleanName(item.organizacao);
+      return !["organizacao", "total", "totais", "orcamento inicial", "total gasto", "orcamento restante"].includes(n);
+    });
 
-export const getLancamentos = createServerFn({ method: "GET" }).handler(
+  const secretaria = parsed.find((item) => cleanName(item.organizacao) === "secretaria");
+  if (!secretaria) return parsed;
 
-  async () => {
-    const rows = await readRows();
-    const entries = rows
-      .slice(1)
-      .map((row, i) => ({ row, index: i + 1 }))
-      .filter(({ row }) => !isPlaceholderRow(row))
-      .map(({ row, index }) => toLancamento(row, index));
-    return { lancamentos: entries.slice(-15).reverse() };
-  },
-);
+  const subNames = new Set(["agua mineral", "centro de distribuicao", "obra missionaria", "thf"]);
+  const subcategorias = parsed
+    .filter((item) => subNames.has(cleanName(item.organizacao)))
+    .map((item) => ({ ...item, tipo: "subcategoria" as const }));
 
-const addSchema = z.object({
-  codigo: z.string().trim().min(1).max(10),
-  organizacao: z.string().trim().min(1).max(100),
-  data: z.string().regex(/^\d{2}\/\d{2}\/\d{4}$/, "Data inválida"),
-  tipo: z.enum(["ENTRADA", "SAÍDA"]),
-  valor: z.string().trim().min(1).max(20),
-  finalidade: z.string().trim().min(1).max(500),
-});
+  secretaria.tipo = "grupo";
+  secretaria.subcategorias = subcategorias;
 
-export const addLancamento = createServerFn({ method: "POST" })
-  .inputValidator((data) => addSchema.parse(data))
-  .handler(async ({ data }) => {
-    const rows = await readRows();
-
-    // First placeholder row (1-indexed, including header row offset)
-    let targetRow = -1;
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      if (row && isPlaceholderRow(row)) {
-        targetRow = i + 1;
-        break;
-      }
-    }
-    if (targetRow === -1) {
-      throw new Error(
-        "Não há linhas livres na planilha. Adicione mais linhas na aba CONTROLE ENT|SAI.",
-      );
-    }
-
-    // Next payment number = max existing + 1
-    let maxPagamento = 0;
-    for (const row of rows.slice(1)) {
-      if (isPlaceholderRow(row)) continue;
-      const n = Number.parseInt((row[7] ?? "").trim(), 10);
-      if (!Number.isNaN(n) && n > maxPagamento) maxPagamento = n;
-    }
-    const pagamento = String(maxPagamento + 1);
-
-    const writeRange = `'${SHEET_NAME}'!A${targetRow}:H${targetRow}`;
-    const res = await fetch(
-      `${gatewayBase()}/${writeRange}?valueInputOption=USER_ENTERED`,
-      {
-        method: "PUT",
-        headers: gatewayHeaders(),
-        body: JSON.stringify({
-          range: writeRange,
-          majorDimension: "ROWS",
-          values: [
-            [
-              data.codigo,
-              data.organizacao,
-              data.data,
-              data.tipo,
-              data.valor,
-              data.finalidade,
-              "",
-              pagamento,
-            ],
-          ],
-        }),
-      },
-    );
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(`Sheets write failed [${res.status}]: ${body}`);
-      throw new Error(`Falha ao gravar na planilha [${res.status}]`);
-    }
-
-    return { ok: true, pagamento, linha: targetRow };
-  },
-);
+  return parsed.filter((item) => !subNames.has(cleanName(item.organizacao)));
+}
