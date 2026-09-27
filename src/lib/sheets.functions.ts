@@ -68,24 +68,24 @@ async function readSheetRange(sheetName: string): Promise<string[][]> {
 function normalizeTabName(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
-    .replace(/\\s+/g, "-");
+    .replace(/\s+/g, "-");
 }
 
 function isMonthlyTab(value: string): boolean {
-  return /^(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\\s+\\d{4}$/i.test(
-    value.trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, ""),
+  return /^(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(?:\s+\d{4})?$/i.test(
+    value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
   );
 }
 
 function numberValue(value: string): number {
   const normalized = value
-    .replace(/R\\$\\s?/i, "")
-    .replace(/\\./g, "")
+    .replace(/R\$\s?/i, "")
+    .replace(/\./g, "")
     .replace(",", ".")
-    .replace(/[^\\d.-]/g, "");
+    .replace(/[^\d.-]/g, "");
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
