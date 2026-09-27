@@ -109,35 +109,35 @@ function headerIndex(headers: string[], names: string[]): number {
 }
 
 function normalizeBudgetRows(rows: string[][]): OrcamentoMes["organizacoes"] {
-  const headerRowIndex = rows.findIndex((row) =>
-    row.some((cell) => /organiz|orcamento|orçamento/i.test(cell)),
-  );
-  if (headerRowIndex < 0) return [];
-
-  const headers = rows[headerRowIndex] ?? [];
-  const organizationIndex = headerIndex(headers, ["organiz"]);
-  const budgetIndex = headerIndex(headers, ["orcamento", "orçamento"]);
-  const usedIndex = headerIndex(headers, ["utilizado", "gasto", "total"]);
-  const remainingIndex = headerIndex(headers, ["restante", "saldo"]);
-  const weekIndexes = headers
-    .map((header, index) => (/semana|\\bS[1-5]\\b/i.test(header) ? index : -1))
-    .filter((index) => index >= 0);
-
-  if (organizationIndex < 0) return [];
   return rows
-    .slice(headerRowIndex + 1)
-    .filter((row) => (row[organizationIndex] ?? "").trim())
-    .map((row) => {
-      const semanas = weekIndexes.map((index) => row[index] ?? "");
-      const utilizado = usedIndex >= 0 ? row[usedIndex] ?? "" : formatMoney(semanas.reduce((sum, value) => sum + numberValue(value), 0));
-      return {
-        organizacao: (row[organizationIndex] ?? "").trim(),
-        orcamento: budgetIndex >= 0 ? row[budgetIndex] ?? "" : "",
-        semanas,
-        utilizado,
-        restante: remainingIndex >= 0 ? row[remainingIndex] ?? "" : "",
-      };
-    });
+    .slice(0, 14)
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => {
+      const organization = (row[1] ?? "").trim();
+      return Boolean(organization) && !/organiza|orcamento|orçamento/i.test(organization);
+    })
+    .map(({ row, index }) => ({
+      linha: index + 1,
+      organizacao: (row[1] ?? "").trim(),
+      orcamento: formatSheetMoney(row[2]),
+      semanas: [
+        formatSheetMoney(row[3]),
+        formatSheetMoney(row[4]),
+        formatSheetMoney(row[5]),
+        formatSheetMoney(row[6]),
+        formatSheetMoney(row[7]),
+      ],
+      utilizado: formatSheetMoney(row[8]),
+      restante: formatSheetMoney(row[9]),
+    }));
+}
+
+function summaryValue(rows: string[][], columnIndex: number): string {
+  for (let rowIndex = 16; rowIndex >= 14; rowIndex -= 1) {
+    const value = rows[rowIndex]?.[columnIndex];
+    if ((value ?? "").trim()) return formatSheetMoney(value);
+  }
+  return "";
 }
 
 
