@@ -16,6 +16,24 @@ export type Lancamento = {
   pagamento: string;
 };
 
+export type OrcamentoOrganizacao = {
+  organizacao: string;
+  orcamento: string;
+  semanas: string[];
+  utilizado: string;
+  restante: string;
+};
+
+export type OrcamentoMes = {
+  nome: string;
+  slug: string;
+  organizacoes: OrcamentoOrganizacao[];
+  totalOrcamento: string;
+  totalUtilizado: string;
+  totalRestante: string;
+};
+
+
 function gatewayBase() {
   return `https://connector-gateway.lovable.dev/google_sheets/v4/spreadsheets/${SPREADSHEET_ID}/values`;
 }
