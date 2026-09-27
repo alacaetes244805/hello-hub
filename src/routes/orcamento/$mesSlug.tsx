@@ -16,8 +16,10 @@ function Relatorio() {
   const { mesSlug } = Route.useLoaderData();
   const fetchMes = useServerFn(getOrcamentoMes);
   const [aberta, setAberta] = useState<string | null>(null);
-    const nomeMes = mesSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  const { data, isLoading, isError } = useQuery({ queryKey: ["orcamento-mes", mesSlug], queryFn: () => fetchMes({ data: { nome: nomeMes } }) });
+    const { data, isLoading, isError } = useQuery({
+    queryKey: ["orcamento-mes", mesSlug],
+    queryFn: () => fetchMes({ data: { nome: mesSlug, slug: mesSlug } }),
+  });
   if (isLoading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando relatório...</div>;
     if (isError) return <div className="p-6 text-center text-muted-foreground">Não foi possível carregar os dados da planilha. Verifique a conexão do Google Sheets e tente novamente.</div>;
   if (!data) return <div className="p-6 text-center text-muted-foreground">Relatório não encontrado.</div>;
