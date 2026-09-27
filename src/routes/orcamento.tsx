@@ -250,8 +250,8 @@ function Orcamento() {
           <Card>
             <CardContent className="p-6 text-center">
               <p className="font-medium text-destructive">Não foi possível localizar as abas mensais.</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Verifique a conexão/autorização do Google Sheets e tente novamente.
+              <p className="mt-2 text-sm text-muted-foreground break-words">
+                {mesesQuery.error instanceof Error ? mesesQuery.error.message : "Verifique a conexão/autorização do Google Sheets e tente novamente."}
               </p>
             </CardContent>
           </Card>
@@ -263,14 +263,14 @@ function Orcamento() {
           </Card>
         ) : relatorioQuery.isLoading ? (
           <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando Setembro 2026...
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando {mesesQuery.data?.meses.find((mes) => mes.slug === selectedSlug)?.nome ?? selectedSlug}...
           </div>
         ) : relatorioQuery.isError ? (
           <Card>
             <CardContent className="p-6 text-center">
               <p className="font-medium text-destructive">A aba {mesesQuery.data?.meses.find((mes) => mes.slug === selectedSlug)?.nome ?? selectedSlug} foi localizada, mas os dados não puderam ser carregados.</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Verifique se a aba contém as colunas B:J do orçamento e se a integração com o Google Sheets está autorizada.
+                {relatorioQuery.error instanceof Error ? relatorioQuery.error.message : "Verifique se a aba contém as colunas B:J do orçamento e se a integração com o Google Sheets está autorizada."}
               </p>
             </CardContent>
           </Card>
