@@ -303,8 +303,12 @@ function Orcamento() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="mx-auto max-w-6xl px-4 py-6">
-          <a href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Início
+          <a
+            href="/"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground active:scale-[0.98]"
+          >
+            <span aria-hidden="true">←</span>
+            Voltar
           </a>
           <div className="mt-4">
             <p className="text-sm font-medium uppercase tracking-wider text-primary">
