@@ -189,15 +189,33 @@ export const getOrcamentoMes = createServerFn({ method: "GET" })
     // I = total gasto da linha
     // J = orçamento restante da linha
 
-    const organizacoes = Array.from({ length: 8 }, (_, index) => readLinha(rows, index + 3))
-      .filter((linha) => linha.organizacao !== "");
+    const nomesOrganizacoes = [
+      "Sociedade de Socorro",
+      "Quórum de Élderes",
+      "Rapazes",
+      "Moças",
+      "JAS",
+      "Primária",
+      "Seminário",
+      "Secretaria",
+    ];
 
-    const subgruposSecretaria = Array.from({ length: 4 }, (_, index) => readLinha(rows, index + 11))
-      .filter((linha) => linha.organizacao !== "");
+    const nomesSubgrupos = [
+      "Água Mineral",
+      "Centro de Distribuição",
+      "Obra Missionária",
+      "THF",
+    ];
 
-    if (organizacoes.length === 0) {
-      throw new Error('A aba "' + nomeAba + '" foi lida, mas nenhuma categoria foi encontrada em B3:B10.');
-    }
+    const organizacoes = nomesOrganizacoes.map((nome, index) => ({
+      ...readLinha(rows, index + 3),
+      organizacao: nome,
+    }));
+
+    const subgruposSecretaria = nomesSubgrupos.map((nome, index) => ({
+      ...readLinha(rows, index + 11),
+      organizacao: nome,
+    }));
 
     return {
       nome: nomeAba,
