@@ -21,28 +21,71 @@ function Money({ value }: { value: string }) {
   return <span className="font-semibold tabular-nums">{value || "—"}</span>;
 }
 
-function MonthButton({
+function MonthSection({
   month,
-  selected,
-  onClick,
+  aberto,
+  onToggle,
 }: {
   month: { nome: string; slug: string };
-  selected: boolean;
-  onClick: () => void;
+  aberto: boolean;
+  onToggle: () => void;
 }) {
+  const fetchMes = useServerFn(getOrcamentoMes);
+  const relatorioQuery = useQuery({
+    queryKey: ["orcamento-mes-novo", month.slug],
+    enabled: aberto,
+    queryFn: () =>
+      fetchMes({
+        data: { nome: month.nome, slug: month.slug },
+      }),
+  });
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors",
-        selected
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card hover:bg-accent",
-      ].join(" ")}
-    >
-      {month.nome}
-    </button>
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-accent/50"
+        aria-expanded={aberto}
+      >
+        <span className="flex items-center gap-3">
+          {aberto ? (
+            <ChevronDown className="h-5 w-5 shrink-0" />
+          ) : (
+            <ChevronRight className="h-5 w-5 shrink-0" />
+          )}
+          <span className="text-base font-bold">{month.nome}</span>
+        </span>
+
+        <span className="text-xs text-muted-foreground">
+          {aberto ? "Ocultar demonstrativo" : "Ver demonstrativo"}
+        </span>
+      </button>
+
+      {aberto && (
+        <div className="border-t border-border bg-muted/10 p-4 sm:p-6">
+          {relatorioQuery.isLoading ? (
+            <div className="flex min-h-[180px] items-center justify-center text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Abrindo {month.nome}...
+            </div>
+          ) : relatorioQuery.isError ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-center">
+              <p className="font-medium text-destructive">
+                Não foi possível carregar {month.nome}.
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {relatorioQuery.error instanceof Error
+                  ? relatorioQuery.error.message
+                  : "Verifique a estrutura da aba mensal."}
+              </p>
+            </div>
+          ) : relatorioQuery.data ? (
+            <Demonstrativo relatorio={relatorioQuery.data} />
+          ) : null}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -226,90 +269,76 @@ function Demonstrativo({ relatorio }: { relatorio: OrcamentoMes }) {
 
 function Orcamento() {
   const fetchMeses = useServerFn(getOrcamentoMeses);
-  const fetchMes = useServerFn(getOrcamentoMes);
 
   const mesesQuery = useQuery({
     queryKey: ["orcamento-meses"],
     queryFn: () => fetchMeses(),
   });
 
-  const [mesSlug, setMesSlug] = useState("");
-  const selectedSlug = mesSlug || mesesQuery.data?.meses[0]?.slug || "";
-
-  const relatorioQuery = useQuery({
-    queryKey: ["orcamento-mes-novo", selectedSlug],
-    enabled: Boolean(selectedSlug),
-    queryFn: () => fetchMes({ data: { nome: selectedSlug, slug: selectedSlug } }),
-  });
-
-  const selectedMonth = mesesQuery.data?.meses.find((mes) => mes.slug === selectedSlug);
+  const [mesAberto, setMesAberto] = useState("");
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="mx-auto max-w-6xl px-4 py-6">
-          <a href="/" className="text-sm text-muted-foreground hover:text-foreground">← Início</a>
+          <a href="/" className="text-sm text-muted-foreground hover:text-foreground">
+            ← Início
+          </a>
           <div className="mt-4">
-            <p className="text-sm font-medium uppercase tracking-wider text-primary">Ala Caetés</p>
+            <p className="text-sm font-medium uppercase tracking-wider text-primary">
+              Ala Caetés
+            </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight">Orçamento</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Selecione uma aba mensal para abrir o demonstrativo.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Selecione um mês para visualizar o demonstrativo.
+            </p>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
         {mesesQuery.isLoading ? (
           <div className="flex min-h-[250px] items-center justify-center text-muted-foreground">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Localizando os meses...
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Localizando os meses...
           </div>
         ) : mesesQuery.isError ? (
           <Card>
             <CardContent className="p-6 text-center">
-              <p className="font-medium text-destructive">Não foi possível localizar as abas mensais.</p>
+              <p className="font-medium text-destructive">
+                Não foi possível localizar as abas mensais.
+              </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {mesesQuery.error instanceof Error ? mesesQuery.error.message : "Verifique a conexão com o Google Sheets."}
+                {mesesQuery.error instanceof Error
+                  ? mesesQuery.error.message
+                  : "Verifique a conexão com o Google Sheets."}
               </p>
             </CardContent>
           </Card>
         ) : !mesesQuery.data?.meses.length ? (
           <Card>
-            <CardContent className="p-6 text-center text-muted-foreground">Nenhuma aba com mês e ano foi encontrada.</CardContent>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              Nenhuma aba com mês e ano foi encontrada.
+            </CardContent>
           </Card>
         ) : (
-          <>
-            <Card>
-              <CardHeader><CardTitle className="text-lg">Meses encontrados na planilha</CardTitle></CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                {mesesQuery.data.meses.map((mes) => (
-                  <MonthButton
-                    key={mes.slug}
-                    month={mes}
-                    selected={mes.slug === selectedSlug}
-                    onClick={() => setMesSlug(mes.slug)}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-
-            {relatorioQuery.isLoading ? (
-              <div className="flex min-h-[250px] items-center justify-center text-muted-foreground">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Abrindo {selectedMonth?.nome ?? selectedSlug}...
-              </div>
-            ) : relatorioQuery.isError ? (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <p className="font-medium text-destructive">Não foi possível carregar {selectedMonth?.nome ?? selectedSlug}.</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {relatorioQuery.error instanceof Error ? relatorioQuery.error.message : "Verifique a estrutura da aba mensal."}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : relatorioQuery.data ? (
-              <Demonstrativo relatorio={relatorioQuery.data} />
-            ) : null}
-          </>
+          <div className="space-y-3">
+            {mesesQuery.data.meses.map((mes) => (
+              <MonthSection
+                key={mes.slug}
+                month={mes}
+                aberto={mes.slug === mesAberto}
+                onToggle={() =>
+                  setMesAberto((atual) =>
+                    atual === mes.slug ? "" : mes.slug,
+                  )
+                }
+              />
+            ))}
+          </div>
         )}
       </main>
     </div>
   );
 }
+
