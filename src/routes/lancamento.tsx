@@ -99,6 +99,12 @@ function Lancamento() {
   }
 
   function iniciarEdicao(lancamento: LancamentoType) {
+    const confirmado = window.confirm(
+      `Tem certeza que deseja editar o lançamento de ${lancamento.organizacao} no valor de ${lancamento.valor}?\\n\\nSe confirmar, o lançamento será aberto no formulário para você alterar os dados.`,
+    );
+
+    if (!confirmado) return;
+
     setEditando(lancamento);
     setOrganizacao(lancamento.organizacao);
     setDataLanc(lancamento.data);
