@@ -281,8 +281,57 @@ const addSchema = z.object({
   finalidade: z.string().trim().min(1).max(500),
 });
 
+const lancamentoSchema = z.object({
+  codigo: z.string().trim().min(1).max(10),
+  organizacao: z.string().trim().min(1).max(100),
+  data: z.string().regex(/^\d{2}\/\d{2}\/\d{4}$/, "Data inválida"),
+  tipo: z.enum(["ENTRADA", "SAÍDA"]),
+  valor: z.string().trim().min(1).max(20),
+  finalidade: z.string().trim().min(1).max(500),
+});
+
+async function writeLancamentoRow(rowNumber: number, data: {
+  codigo: string;
+  organizacao: string;
+  data: string;
+  tipo: "ENTRADA" | "SAÍDA";
+  valor: string;
+  finalidade: string;
+  pagamento: string;
+}) {
+  const writeRange = "'" + SHEET_NAME + "'!A" + rowNumber + ":H" + rowNumber;
+
+  const res = await fetch(
+    gatewayBase() + "/" + writeRange + "?valueInputOption=USER_ENTERED",
+    {
+      method: "PUT",
+      headers: gatewayHeaders(),
+      body: JSON.stringify({
+        range: writeRange,
+        majorDimension: "ROWS",
+        values: [[
+          data.codigo,
+          data.organizacao,
+          data.data,
+          data.tipo,
+          data.valor,
+          data.finalidade,
+          "",
+          data.pagamento,
+        ]],
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("Sheets launch write failed [" + res.status + "]: " + body);
+    throw new Error("Falha ao gravar na planilha [" + res.status + "]");
+  }
+}
+
 export const addLancamento = createServerFn({ method: "POST" })
-  .inputValidator((data) => addSchema.parse(data))
+  .inputValidator((data) => lancamentoSchema.parse(data))
   .handler(async ({ data }) => {
     const rows = await readRows();
 
@@ -314,7 +363,54 @@ export const addLancamento = createServerFn({ method: "POST" })
     }
 
     const pagamento = String(maxPagamento + 1);
-    const writeRange = "'" + SHEET_NAME + "'!A" + targetRow + ":H" + targetRow;
+
+    await writeLancamentoRow(targetRow, {
+      ...data,
+      pagamento,
+    });
+
+    return { ok: true, pagamento, linha: targetRow };
+  });
+
+export const updateLancamento = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    lancamentoSchema.extend({
+      row: z.number().int().min(2),
+      pagamento: z.string().trim().min(1).max(20),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const rows = await readRows();
+    const current = rows[data.row - 1];
+
+    if (!current || isPlaceholderRow(current)) {
+      throw new Error("O lançamento não foi encontrado na linha " + data.row + ".");
+    }
+
+    await writeLancamentoRow(data.row, {
+      codigo: data.codigo,
+      organizacao: data.organizacao,
+      data: data.data,
+      tipo: data.tipo,
+      valor: data.valor,
+      finalidade: data.finalidade,
+      pagamento: data.pagamento,
+    });
+
+    return { ok: true, linha: data.row, pagamento: data.pagamento };
+  });
+
+export const deleteLancamento = createServerFn({ method: "POST" })
+  .inputValidator((data) => z.object({ row: z.number().int().min(2) }).parse(data))
+  .handler(async ({ data }) => {
+    const rows = await readRows();
+    const current = rows[data.row - 1];
+
+    if (!current || isPlaceholderRow(current)) {
+      throw new Error("O lançamento não foi encontrado na linha " + data.row + ".");
+    }
+
+    const writeRange = "'" + SHEET_NAME + "'!A" + data.row + ":H" + data.row;
 
     const res = await fetch(
       gatewayBase() + "/" + writeRange + "?valueInputOption=USER_ENTERED",
@@ -324,25 +420,16 @@ export const addLancamento = createServerFn({ method: "POST" })
         body: JSON.stringify({
           range: writeRange,
           majorDimension: "ROWS",
-          values: [[
-            data.codigo,
-            data.organizacao,
-            data.data,
-            data.tipo,
-            data.valor,
-            data.finalidade,
-            "",
-            pagamento,
-          ]],
+          values: [["", "", "", "", "", "", "", ""]],
         }),
       },
     );
 
     if (!res.ok) {
       const body = await res.text();
-      console.error("Sheets write failed [" + res.status + "]: " + body);
-      throw new Error("Falha ao gravar na planilha [" + res.status + "]");
+      console.error("Sheets launch delete failed [" + res.status + "]: " + body);
+      throw new Error("Falha ao excluir o lançamento da planilha [" + res.status + "]");
     }
 
-    return { ok: true, pagamento, linha: targetRow };
+    return { ok: true, linha: data.row };
   });
