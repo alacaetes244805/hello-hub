@@ -130,26 +130,37 @@ function LinhaExpansivel({ linha }: { linha: OrcamentoLinha }) {
       <button
         type="button"
         onClick={() => setAberta((value) => !value)}
-        className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 p-4 text-left transition-colors hover:bg-accent/50"
+        className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-accent/50"
       >
-        <span className="flex min-w-0 items-center gap-2">
-          {aberta ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-          <span className="truncate font-semibold">{linha.organizacao}</span>
+        <span className="mt-1 shrink-0">
+          {aberta ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
         </span>
 
-        <span className="hidden min-w-[120px] text-right text-sm sm:block">
-          <span className="block text-xs text-muted-foreground">Orçamento</span>
-          <Money value={linha.orcamento} />
-        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block break-words font-semibold text-foreground">
+            {linha.organizacao}
+          </span>
 
-        <span className="min-w-[100px] text-right text-sm">
-          <span className="block text-xs text-muted-foreground">Total</span>
-          <Money value={linha.utilizado} />
-        </span>
+          <span className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <span className="text-left text-sm">
+              <span className="block text-xs text-muted-foreground">Orçamento</span>
+              <Money value={linha.orcamento} />
+            </span>
 
-        <span className="min-w-[110px] text-right text-sm">
-          <span className="block text-xs text-muted-foreground">Restante</span>
-          <Money value={linha.restante} />
+            <span className="text-left text-sm">
+              <span className="block text-xs text-muted-foreground">Total</span>
+              <Money value={linha.utilizado} />
+            </span>
+
+            <span className="text-left text-sm">
+              <span className="block text-xs text-muted-foreground">Restante</span>
+              <Money value={linha.restante} />
+            </span>
+          </span>
         </span>
       </button>
 
@@ -172,26 +183,37 @@ function Secretaria({
       <button
         type="button"
         onClick={() => setAberta((value) => !value)}
-        className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 p-4 text-left transition-colors hover:bg-accent/50"
+        className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-accent/50"
       >
-        <span className="flex min-w-0 items-center gap-2">
-          {aberta ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-          <span className="truncate font-semibold">{linha.organizacao}</span>
+        <span className="mt-1 shrink-0">
+          {aberta ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
         </span>
 
-        <span className="hidden min-w-[120px] text-right text-sm sm:block">
-          <span className="block text-xs text-muted-foreground">Orçamento</span>
-          <Money value={linha.orcamento} />
-        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block break-words font-semibold text-foreground">
+            {linha.organizacao}
+          </span>
 
-        <span className="min-w-[100px] text-right text-sm">
-          <span className="block text-xs text-muted-foreground">Total</span>
-          <Money value={linha.utilizado} />
-        </span>
+          <span className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <span className="text-left text-sm">
+              <span className="block text-xs text-muted-foreground">Orçamento</span>
+              <Money value={linha.orcamento} />
+            </span>
 
-        <span className="min-w-[110px] text-right text-sm">
-          <span className="block text-xs text-muted-foreground">Restante</span>
-          <Money value={linha.restante} />
+            <span className="text-left text-sm">
+              <span className="block text-xs text-muted-foreground">Total</span>
+              <Money value={linha.utilizado} />
+            </span>
+
+            <span className="text-left text-sm">
+              <span className="block text-xs text-muted-foreground">Restante</span>
+              <Money value={linha.restante} />
+            </span>
+          </span>
         </span>
       </button>
 
